@@ -1,11 +1,12 @@
-FROM python:3.6
+FROM python:onbuild
 
 ENV REDIS_HOST='redis' \
 	REDIS_PORT='6379' \
 	NEO4J_HOST='neo4j' \
 	NEO4J_PORT='7687'
 
-ADD hello.py /graph/hello.py
+ADD requirements.txt /graph/requirements.txt
+ADD scanVK.py /graph/scan.py
 WORKDIR /graph
 
-ENTRYPOINT ["python", "hello.py"]
+ENTRYPOINT ["python", "scan.py", "s"]
