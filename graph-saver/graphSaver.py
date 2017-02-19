@@ -8,7 +8,9 @@ class GraphSaver:
 
         if neo4j_host is None: neo4j_host = os.environ.get('NEO4J_HOST')
         if neo4j_port is None: neo4j_port = os.environ.get('NEO4J_PORT')
-        self.graphDriver = GraphDatabase.driver("bolt://" + neo4j_host + ":" + neo4j_port, auth=basic_auth("neo4j", "neo4j"))
+        uri = "bolt://" + neo4j_host + ":" + neo4j_port
+        # token = basic_auth(os.environ.get("NEO4J_USER"), os.environ.get("NEO4J_PASS"))
+        self.graphDriver = GraphDatabase.driver(uri)
         self.session = self.graphDriver.session()
 
         if redis_host is None: redis_host = os.environ.get('REDIS_HOST')
@@ -23,15 +25,16 @@ class GraphSaver:
             self.process()
 
     def process(self):
-        try:
-            (key, unprocessed) = self._metaInfo.blpop("graph", timeout=5)
-            unprocessed_value = unprocessed.decode()
+        # try:
+        (key, unprocessed) = self._metaInfo.blpop("graph", timeout=1)
+        unprocessed_value = unprocessed.decode()
 
-            persons = self._dataDb.lrange(unprocessed_value, 0, -1)
-        except:
-            persons = self._dataDb.lrange(self.root, 0, -1)
+        persons = self._dataDb.lrange(unprocessed_value, 0, -1)
+        # except:
+            # persons = self._dataDb.lrange(self.root, 0, -1)
 
         persons = [p.decode() for p in persons]
+        print("process " + unprocessed_value)
         self.savePersons(persons)
 
     def savePersons(self, persons):
@@ -42,28 +45,14 @@ class GraphSaver:
                        "MERGE (r)-[:FRIEND]-(a)",
                        {"id1": self.root, "id2": person})
             tx.success = True
-        self.session.close()
 
-# db0 = redis.Redis(host="192.168.99.100", port=32768, db=0)
-# db1 = redis.Redis()
-# pubSub = db1.pubsub()
-# pubSub.subscribe("new-id-with-friends")
-#
-# driver = GraphDatabase.driver("bolt://192.168.99.100:32769", auth=basic_auth("neo4j", "root"))
-# session = driver.session()
-#
-# while True:
-#     pass
-#
-# root = "10000862"
-# friends = db0.lrange(root, 0, -1)
-#
-# with session.begin_transaction() as tx:
-#     for friend in friends:
-#         tx.run("MERGE (r: Person {id: {id1} })"
-#                "MERGE (a: Person {id: {id2} })"
-#                "MERGE (r)-[:FRIEND]-(a)",
-#                {"id1": root, "id2": friend.decode()})
-#     tx.success = True
-#
-# session.close()
+if __name__ == '__main__':
+    # os.environ['REDIS_HOST']='localhost'
+    # os.environ['REDIS_PORT']='6379'
+    # os.environ['NEO4J_HOST']='localhost'
+    # os.environ['NEO4J_PORT']='7687'
+    # os.environ['NEO4J_USER']='neo4j'
+    # os.environ['NEO4J_PASS']='root'
+
+    graph_saver = GraphSaver()
+    graph_saver.run()

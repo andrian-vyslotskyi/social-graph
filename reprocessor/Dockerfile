@@ -12,4 +12,4 @@ ADD requirements.txt /graph/requirements.txt
 ADD scanVK.py /graph/reprocessor.py
 WORKDIR /graph
 
-CMD mantra "0 * * * * ? " python reprocessor.py r
+CMD mantra "* 1 * * * ? " python reprocessor.py r

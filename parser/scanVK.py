@@ -29,14 +29,13 @@ class VkProcessor:
             self.process()
 
     def process(self):
-        unprocessed_value = 0
         try:
             (key, unprocessed) = self._metaInfoDb.brpop(UNPROCESSED, timeout=1)
             unprocessed_value = unprocessed.decode()
-            # self._metaInfoDb.set(unprocessed_value, PROCESSING)
 
             values = self._dataDb.lrange(unprocessed_value, 0, -1)
         except:
+            unprocessed_value = self._root
             values = []
 
         if not values:
@@ -65,16 +64,17 @@ class VkProcessor:
 
                 #set id into collection to mark for graph builder
                 self._metaInfoDb.rpush(GRAPH, v)
-                # pub in channel for neo4j
-                # self._metaInfoDb.publish("new-id-with-friends", v)
             except VkAPIError as err:
                 if err.code == VkAPIError.ACCESS_DENIED:
                     self._metaInfoDb.rpush(DENIED, err.request_params["user_id"])
                 else: print(err)
+            except Exception as exception:
+                print(exception)
+                self._metaInfoDb.rpush(FAILED, v)
 
     def reprocessFailedIds(self):
         print("starting reprocess")
-        failedIds = self._metaInfoDb.lrange(FAILED, 0, -1) #self._metaInfoDb.keys("*[^a-z]")
+        failedIds = self._metaInfoDb.blpop(FAILED, timeout=5)
         for failedId in failedIds:
             try:
                 allFriends = self._dataDb.lrange(failedId, 0, -1)
