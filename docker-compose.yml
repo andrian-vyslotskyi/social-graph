@@ -24,7 +24,8 @@ services:
     environment:
       - NEO4J_AUTH=none
     healthcheck:
-      test: curl localhost:7474
+      test: curl --fail http://localhost:7474 || exit 1
+      retries: 5
 
   parser:
     build: ./parser
