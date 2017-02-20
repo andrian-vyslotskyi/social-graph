@@ -1,4 +1,4 @@
-version: '2'
+version: '2.1'
 # networks:
   # graph:
     # driver: bridge
@@ -23,14 +23,18 @@ services:
       - ./neo4j/data:/data
     environment:
       - NEO4J_AUTH=none
+    healthcheck:
+      test: curl localhost:7474
 
   parser:
     build: ./parser
     image: graph:parser
     container_name: graph-parser
     depends_on:
-      - redis
-      - neo4j
+      redis:
+        condition: service_started
+      neo4j:
+        condition: service_healthy
     links:
       - redis
     restart: always
@@ -40,8 +44,10 @@ services:
     image: graph:reprocessor
     container_name: graph-reprocessor
     depends_on:
-      - redis
-      - neo4j
+      redis:
+        condition: service_started
+      neo4j:
+        condition: service_healthy
     links:
       - redis
 
@@ -50,9 +56,13 @@ services:
     image: graph:saver
     container_name: graph-saver
     depends_on:
-      - redis
-      - neo4j
-      - parser
+    depends_on:
+      redis:
+        condition: service_started
+      neo4j:
+        condition: service_healthy
+      parser:
+        condition: service_started
     links:
       - redis
       - neo4j
