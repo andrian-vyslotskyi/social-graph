@@ -1,0 +1,59 @@
+version: '2'
+# networks:
+  # graph:
+    # driver: bridge
+
+services:
+  redis:
+    image: redis
+    container_name: graph-redis
+    ports:
+      - 6379:6379
+    volumes:
+      - ./redis/data:/data
+
+  neo4j:
+    image: neo4j
+    container_name: graph-neo4j
+    ports:
+      - 7474:7474
+      - 7473:7473
+      - 7687:7687
+    volumes:
+      - ./neo4j/data:/data
+    environment:
+      - NEO4J_AUTH=none
+
+  parser:
+    build: ./parser
+    image: graph:parser
+    container_name: graph-parser
+    depends_on:
+      - redis
+      - neo4j
+    links:
+      - redis
+    restart: always
+
+  reprocessor:
+    build: ./reprocessor
+    image: graph:reprocessor
+    container_name: graph-reprocessor
+    depends_on:
+      - redis
+      - neo4j
+    links:
+      - redis
+
+  graph-saver:
+    build: ./graph-saver
+    image: graph:saver
+    container_name: graph-saver
+    depends_on:
+      - redis
+      - neo4j
+      - parser
+    links:
+      - redis
+      - neo4j
+    restart: always
