@@ -90,3 +90,7 @@ ENV/
 
 .idea/
 .idea\*
+
+redis/
+neo4j/
+rabbitmq/

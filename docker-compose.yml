@@ -27,6 +27,21 @@ services:
       test: curl --fail http://localhost:7474 || exit 1
       retries: 5
 
+  rabbit:
+    image: rabbitmq:3-management
+    hostname: rabbit
+    container_name: graph-rabbit
+    environment:
+      RABBITMQ_ERLANG_COOKIE: "SWQOKODSQALRPCLNMEQG"
+      RABBITMQ_DEFAULT_USER: "rabbit"
+      RABBITMQ_DEFAULT_PASS: "rabbit"
+      RABBITMQ_DEFAULT_VHOST: "/"
+    ports:
+      - 15672:15672
+      - 5672:5672
+    volumes:
+      - ./rabbitmq/data:/var/lib/rabbitmq
+
   parser:
     build: ./parser
     image: graph:parser
@@ -38,6 +53,7 @@ services:
         condition: service_healthy
     links:
       - redis
+      - rabbit
     restart: always
 
   reprocessor:
@@ -51,12 +67,12 @@ services:
         condition: service_healthy
     links:
       - redis
+      - rabbit
 
   graph-saver:
     build: ./graph-saver
     image: graph:saver
     container_name: graph-saver
-    depends_on:
     depends_on:
       redis:
         condition: service_started
@@ -67,4 +83,5 @@ services:
     links:
       - redis
       - neo4j
+      - rabbit
     restart: always
