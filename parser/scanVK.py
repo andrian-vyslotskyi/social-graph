@@ -3,6 +3,7 @@ import redis
 from vk.exceptions import VkAPIError
 import os
 import sys
+import pika
 
 UNPROCESSED = "unprocessed"
 PROCESSING = "processing"
@@ -23,6 +24,14 @@ class VkProcessor:
         self._dataDb = redis.Redis(host=redis_host, port=redis_port, db=0)
         self._metaInfoDb = redis.Redis(host=redis_host, port=redis_port, db=1)
 
+        connection = pika.BlockingConnection(pika.ConnectionParameters(
+            host = os.environ.get('RABBIT_HOST'),
+            port = os.environ.get("RABBIT_PORT")
+        ))
+        self._channel = connection.channel()
+        self._channel.basic_qos(prefetch_count=1)
+        #don't dispatch a new message to a worker until it has processed and acknowledged the previous one
+
     def run(self):
         print("starting scan")
         while (True):
@@ -30,7 +39,7 @@ class VkProcessor:
 
     def process(self):
         try:
-            (key, unprocessed) = self._metaInfoDb.brpop(UNPROCESSED, timeout=1)
+            (key, unprocessed) = self._metaInfoDb.blpop(UNPROCESSED, timeout=1)
             unprocessed_value = unprocessed.decode()
 
             values = self._dataDb.lrange(unprocessed_value, 0, -1)
@@ -40,14 +49,14 @@ class VkProcessor:
 
         if not values:
             values = self._api.friends.get(user_id=self._root)
-            self._dataDb.lpush(self._root, *values)
+            self._dataDb.rpush(self._root, *values)
         else:
             values = [v.decode() for v in values]
 
         try:
             self.saveFriendsForIds(values)
             self._metaInfoDb.delete(unprocessed_value)
-            self._metaInfoDb.lpush(PROCESSED, unprocessed_value)
+            self._metaInfoDb.rpush(PROCESSED, unprocessed_value)
         except Exception as err:
             print(err)
             self._metaInfoDb.rpush(FAILED, unprocessed_value)
@@ -59,7 +68,7 @@ class VkProcessor:
                 friends = self._api.friends.get(user_id=v)  # get friends for id
                 processedIds = [id.decode() for id in self._metaInfoDb.lrange(PROCESSED, 0, -1)]
                 friends = [f for f in friends if f not in processedIds]
-                self._dataDb.lpush(v, *friends)  # save friends if that pair of ids not yet in db
+                self._dataDb.rpush(v, *friends)  # save friends if that pair of ids not yet in db
                 self._metaInfoDb.rpush(UNPROCESSED, v)
 
                 #set id into collection to mark for graph builder
