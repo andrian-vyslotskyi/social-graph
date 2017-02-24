@@ -31,7 +31,7 @@ class VkProcessor:
     def process(self):
         unprocessed_value = 0
         try:
-            (key, unprocessed) = self._metaInfoDb.brpop(UNPROCESSED, timeout=1)
+            (key, unprocessed) = self._metaInfoDb.blpop(UNPROCESSED, timeout=1)
             unprocessed_value = unprocessed.decode()
             # self._metaInfoDb.set(unprocessed_value, PROCESSING)
 
@@ -41,14 +41,14 @@ class VkProcessor:
 
         if not values:
             values = self._api.friends.get(user_id=self._root)
-            self._dataDb.lpush(self._root, *values)
+            self._dataDb.rpush(self._root, *values)
         else:
             values = [v.decode() for v in values]
 
         try:
             self.saveFriendsForIds(values)
             self._metaInfoDb.delete(unprocessed_value)
-            self._metaInfoDb.lpush(PROCESSED, unprocessed_value)
+            self._metaInfoDb.rpush(PROCESSED, unprocessed_value)
         except Exception as err:
             print(err)
             self._metaInfoDb.rpush(FAILED, unprocessed_value)
@@ -60,7 +60,7 @@ class VkProcessor:
                 friends = self._api.friends.get(user_id=v)  # get friends for id
                 processedIds = [id.decode() for id in self._metaInfoDb.lrange(PROCESSED, 0, -1)]
                 friends = [f for f in friends if f not in processedIds]
-                self._dataDb.lpush(v, *friends)  # save friends if that pair of ids not yet in db
+                self._dataDb.rpush(v, *friends)  # save friends if that pair of ids not yet in db
                 self._metaInfoDb.rpush(UNPROCESSED, v)
 
                 #set id into collection to mark for graph builder
@@ -82,7 +82,7 @@ class VkProcessor:
                                        not self._dataDb.exists(friend)]  # if friend not exist in db
                 self.saveFriendsForIds(notProcessedFriends)
                 # self._metaInfoDb.delete(failedId)
-                self._metaInfoDb.lpush(PROCESSED, failedId)
+                self._metaInfoDb.rpush(PROCESSED, failedId)
             except VkAPIError as vkErr:
                 if vkErr.code == VkAPIError.ACCESS_DENIED:
                     self._metaInfoDb.rpush(DENIED, vkErr.request_params["user_id"])
