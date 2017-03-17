@@ -3,7 +3,6 @@ import redis
 from vk.exceptions import VkAPIError
 import os
 import sys
-import pika
 
 UNPROCESSED = "unprocessed"
 PROCESSING = "processing"
@@ -19,18 +18,10 @@ class VkProcessor:
 
         self._vkSession = vk.Session()
         self._api = vk.API(self._vkSession)
-        # AuthSession(app_id='5671534', user_login='andrian.ua@mail.ru', user_password='')
+
 
         self._dataDb = redis.Redis(host=redis_host, port=redis_port, db=0)
         self._metaInfoDb = redis.Redis(host=redis_host, port=redis_port, db=1)
-
-        connection = pika.BlockingConnection(pika.ConnectionParameters(
-            host = os.environ.get('RABBIT_HOST'),
-            port = os.environ.get("RABBIT_PORT")
-        ))
-        self._channel = connection.channel()
-        self._channel.basic_qos(prefetch_count=1)
-        #don't dispatch a new message to a worker until it has processed and acknowledged the previous one
 
     def run(self):
         print("starting scan")
